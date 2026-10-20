@@ -1,0 +1,86 @@
+name: trial release
+
+# Builds trial and publishes it as v<upstream>-trial with a Sparkle appcast
+# signed by this fork's key. sync-upstream.yml starts it after a rebase.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Upstream release tag trial is based on (e.g. v1.2.0)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: trial-release
+
+env:
+  UPSTREAM: NotProtonNot/NotProton
+
+jobs:
+  build:
+    uses: ./.github/workflows/app.yml
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: xcode-27
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: NotProton
+          path: release
+
+      - name: Verify the archive
+        run: |
+          git fetch --no-tags "https://github.com/$UPSTREAM.git" "+refs/tags/$TAG:refs/tags/$TAG"
+          git merge-base --is-ancestor "$TAG" HEAD
+          ditto -x -k release/NotProton.zip release/extracted
+          codesign --verify --strict release/extracted/NotProton.app
+          plist=release/extracted/NotProton.app/Contents/Info.plist
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")" = "${TAG#v}"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$plist")" = \
+            "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/appcast.xml"
+          make -s mincheck APP_BUNDLE=release/extracted/NotProton.app
+
+      - name: Resolve Sparkle tools
+        run: swift package resolve --package-path app
+
+      - name: Generate the appcast
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          {
+            gh release view "$TAG" -R "$UPSTREAM" --json body -q .body
+            printf '\n\n---\n\nTrial build: upstream %s plus CrossOver 14-day trial support, from %s.\n' "$TAG" "$GITHUB_REPOSITORY"
+          } > "$RUNNER_TEMP/notes.md"
+          gh api markdown -F text=@"$RUNNER_TEMP/notes.md" -f mode=gfm -f context="$UPSTREAM" > release/NotProton.html
+          rm -rf release/extracted
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | app/.build/artifacts/sparkle/Sparkle/bin/generate_appcast \
+            --ed-key-file - \
+            --download-url-prefix "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG-trial/" \
+            --embed-release-notes \
+            release
+          cat release/appcast.xml
+
+      - name: Publish the release
+        run: |
+          gh release delete "$TAG-trial" -R "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+          gh release create "$TAG-trial" -R "$GITHUB_REPOSITORY" \
+            release/NotProton.zip \
+            release/appcast.xml \
+            --target "$GITHUB_SHA" \
+            --title "${TAG#v}-trial" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --latest
