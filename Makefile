@@ -685,7 +685,7 @@ app: app-payload $(ICON_CAR)
 	cp app/Info.plist "$(APP_BUNDLE)/Contents/Info.plist"
 	/usr/libexec/PlistBuddy -c \
 		"Set :CFBundleShortVersionString $(APP_VERSION)" -c \
-		"Set :CFBundleVersion $(APP_VERSION)" \
+		"Set :CFBundleVersion $(APP_VERSION).$$(git log -1 --format=%ct)" \
 		"$(APP_BUNDLE)/Contents/Info.plist"
 	cp "$$(swift build --package-path app -c release --show-bin-path)/NotProtonApp" \
 		"$(APP_BUNDLE)/Contents/MacOS/NotProtonApp"
