@@ -1,7 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    " NotProton can be deployed, but the CrossOver compatibility tool cannot be installed without a valid license." : {
+    " NotProton can be deployed, but the CrossOver compatibility tool cannot be installed without a valid license or an active trial." : {
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -18,13 +18,13 @@
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : " NotProton può essere installato, ma lo strumento di compatibilità di CrossOver non può essere installato senza una licenza valida."
+            "value" : " NotProton può essere installato, ma lo strumento di compatibilità di CrossOver non può essere installato senza una licenza valida o una prova attiva."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : " 可以部署 NotProton，但没有有效许可证时无法安装 CrossOver 兼容工具。"
+            "value" : " 可以部署 NotProton，但没有有效许可证或有效试用期时无法安装 CrossOver 兼容工具。"
           }
         }
       }
@@ -2864,6 +2864,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "构建版本 %@ 未记录 %@ ntdll 的哈希值。"
+          }
+        }
+      }
+    },
+    "Buy CrossOver at https://www.codeweavers.com/store, then try again." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kaufen Sie CrossOver unter https://www.codeweavers.com/store und versuchen Sie es dann erneut."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Achetez CrossOver sur https://www.codeweavers.com/store, puis réessayez."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acquista CrossOver su https://www.codeweavers.com/store, poi riprova."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在 https://www.codeweavers.com/store 购买 CrossOver，然后重试。"
           }
         }
       }
@@ -12178,6 +12206,34 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用此工具不会删除游戏存档。"
+          }
+        }
+      }
+    },
+    "Your CrossOver trial has ended." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ihre CrossOver-Testversion ist abgelaufen."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre essai de CrossOver est terminé."
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La prova di CrossOver è terminata."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CrossOver 试用期已结束。"
           }
         }
       }
