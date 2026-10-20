@@ -1,0 +1,105 @@
+name: sync upstream
+
+# Keeps main a mirror of upstream and trial rebased onto upstream's newest
+# release, then hands the rebased trial to trial-release.yml. That runs as its
+# own workflow so it builds the pushed commit with the workflows it carries.
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Release again even if the trial release for this tag exists
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: sync-upstream
+
+env:
+  UPSTREAM: NotProtonNot/NotProton
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find upstream's newest release
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          tag=$(gh release view -R "$UPSTREAM" --json tagName -q .tagName)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [ "$FORCE" != true ] && gh release view "$tag-trial" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$tag-trial is already released"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # GITHUB_TOKEN cannot push commits that change .github/workflows, which
+      # upstream sometimes does. SYNC_TOKEN (a PAT with contents and workflows
+      # write on this repo) covers that case.
+      - uses: actions/checkout@v4
+        if: steps.tag.outputs.skip != 'true'
+        with:
+          ref: trial
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
+
+      - name: Fetch upstream
+        if: steps.tag.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          git remote add upstream "https://github.com/$UPSTREAM.git"
+          git fetch --no-tags upstream main "+refs/tags/$TAG:refs/tags/$TAG"
+
+      # A plain push only fast-forwards, so main is never rewritten.
+      - name: Fast-forward main
+        if: steps.tag.outputs.skip != 'true'
+        run: git push origin upstream/main:refs/heads/main
+
+      - name: Rebase trial
+        if: steps.tag.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git rebase "$TAG"; then exit 0; fi
+
+          commit=$(git log -1 --format='%h %s' REBASE_HEAD)
+          files=$(git diff --name-only --diff-filter=U | sed 's/^/- `/; s/$/`/')
+          git rebase --abort
+          title="Rebase conflict on $TAG"
+          body=$(printf 'Rebasing `trial` onto upstream `%s` stopped at:\n\n    %s\n\nConflicted files:\n\n%s\n\nNothing was pushed. Run: %s/%s/actions/runs/%s\n' \
+            "$TAG" "$commit" "$files" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+          issue=$(gh issue list -R "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number,title \
+            -q ".[] | select(.title == \"$title\") | .number" | head -1)
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" -R "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create -R "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
+          echo "::error::$title at $commit"
+          exit 1
+
+      - name: Push trial
+        if: steps.tag.outputs.skip != 'true'
+        run: git push --force-with-lease=trial:origin/trial origin HEAD:trial
+
+      - name: Build and release
+        if: steps.tag.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          gh workflow run trial-release.yml -R "$GITHUB_REPOSITORY" --ref trial -f tag="$TAG"
+          echo "Started trial-release for $TAG: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/trial-release.yml"
